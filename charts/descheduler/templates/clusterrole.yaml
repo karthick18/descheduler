@@ -24,6 +24,11 @@ rules:
 - apiGroups: ["scheduling.k8s.io"]
   resources: ["priorityclasses"]
   verbs: ["get", "watch", "list"]
+{{- if .Values.clusterRole.rules }}
+{{- with .Values.clusterRole.rules }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
+{{- end }}
 {{- if .Values.podSecurityPolicy.create }}
 - apiGroups: ['policy']
   resources: ['podsecuritypolicies']

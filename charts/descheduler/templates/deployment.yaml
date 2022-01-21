@@ -38,6 +38,8 @@ spec:
             - "/policy-dir/policy.yaml"
             - "--descheduling-interval"
             - {{ required "deschedulingInterval required for running as Deployment" .Values.deschedulingInterval }}
+            - "--mitigation-grace-period"
+            - {{ .Values.mitigationGracePeriod | quote }}
             {{- range $key, $value := .Values.cmdOptions }}
             - {{ printf "--%s" $key | quote }}
             {{- if $value }}
