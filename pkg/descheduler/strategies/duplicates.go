@@ -66,6 +66,7 @@ func RemoveDuplicatePods(
 	strategy api.DeschedulerStrategy,
 	nodes []*v1.Node,
 	podEvictor *evictions.PodEvictor,
+	opts ...StrategyOption,
 ) {
 	if err := validateRemoveDuplicatePodsParams(strategy.Params); err != nil {
 		klog.ErrorS(err, "Invalid RemoveDuplicatePods parameters")

@@ -33,6 +33,7 @@ func RemoveFailedPods(
 	strategy api.DeschedulerStrategy,
 	nodes []*v1.Node,
 	podEvictor *evictions.PodEvictor,
+	opts ...StrategyOption,
 ) {
 	strategyParams, err := validateAndParseRemoveFailedPodsParams(ctx, client, strategy.Params)
 	if err != nil {

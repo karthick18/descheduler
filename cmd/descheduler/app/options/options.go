@@ -19,11 +19,11 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/logs"
+	"time"
 
 	"sigs.k8s.io/descheduler/pkg/apis/componentconfig"
 	"sigs.k8s.io/descheduler/pkg/apis/componentconfig/v1alpha1"
@@ -31,7 +31,9 @@ import (
 )
 
 const (
-	DefaultDeschedulerPort = 10258
+	DefaultDeschedulerPort        = 10258
+	DefaultDeschedulingRunTimeout = 1 * time.Minute
+	DefaultMitigationGracePeriod  = 2 * time.Minute
 )
 
 // DeschedulerServer configuration
@@ -53,6 +55,9 @@ func NewDeschedulerServer() (*DeschedulerServer, error) {
 
 	secureServing := apiserveroptions.NewSecureServingOptions().WithLoopback()
 	secureServing.BindPort = DefaultDeschedulerPort
+
+	cfg.DeschedulingRunTimeout = DefaultDeschedulingRunTimeout
+	cfg.MitigationGracePeriod = DefaultMitigationGracePeriod
 
 	return &DeschedulerServer{
 		DeschedulerConfiguration: *cfg,
@@ -82,6 +87,8 @@ func newDefaultComponentConfig() (*componentconfig.DeschedulerConfiguration, err
 func (rs *DeschedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&rs.Logging.Format, "logging-format", "text", `Sets the log format. Permitted formats: "text", "json". Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --skip-headers, --skip-log-headers, --stderrthreshold, --log-flush-frequency.\nNon-default choices are currently alpha and subject to change without warning.`)
 	fs.DurationVar(&rs.DeschedulingInterval, "descheduling-interval", rs.DeschedulingInterval, "Time interval between two consecutive descheduler executions. Setting this value instructs the descheduler to run in a continuous loop at the interval specified.")
+	fs.DurationVar(&rs.DeschedulingRunTimeout, "descheduling-run-timeout", rs.DeschedulingRunTimeout, "Time to wait for all descheduling strategies to complete for each interval run.")
+	fs.DurationVar(&rs.MitigationGracePeriod, "mitigation-grace-period", rs.MitigationGracePeriod, "Time to wait after mitigation before pod is evicted.")
 	fs.StringVar(&rs.KubeconfigFile, "kubeconfig", rs.KubeconfigFile, "File with  kube configuration.")
 	fs.StringVar(&rs.PolicyConfigFile, "policy-config-file", rs.PolicyConfigFile, "File with descheduler policy configuration.")
 	fs.BoolVar(&rs.DryRun, "dry-run", rs.DryRun, "execute descheduler in dry run mode.")

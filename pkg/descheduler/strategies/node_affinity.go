@@ -47,7 +47,7 @@ func validatePodsViolatingNodeAffinityParams(params *api.StrategyParameters) err
 }
 
 // RemovePodsViolatingNodeAffinity evicts pods on nodes which violate node affinity
-func RemovePodsViolatingNodeAffinity(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor) {
+func RemovePodsViolatingNodeAffinity(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor, opts ...StrategyOption) {
 	if err := validatePodsViolatingNodeAffinityParams(strategy.Params); err != nil {
 		klog.ErrorS(err, "Invalid RemovePodsViolatingNodeAffinity parameters")
 		return

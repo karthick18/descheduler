@@ -31,6 +31,13 @@ type DeschedulerConfiguration struct {
 	// Time interval for descheduler to run
 	DeschedulingInterval time.Duration
 
+	// Time to wait for each descheduling run to complete
+	DeschedulingRunTimeout time.Duration
+
+	// Mitigation Grace period. A strategy option for connectpolicy
+	// Specifies the duration to wait after attempting mitigation before pod is evicted
+	MitigationGracePeriod time.Duration
+
 	// KubeconfigFile is path to kubeconfig file with authorization and master
 	// location information.
 	KubeconfigFile string

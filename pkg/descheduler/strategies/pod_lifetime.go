@@ -56,7 +56,7 @@ func validatePodLifeTimeParams(params *api.StrategyParameters) error {
 }
 
 // PodLifeTime evicts pods on nodes that were created more than strategy.Params.MaxPodLifeTimeSeconds seconds ago.
-func PodLifeTime(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor) {
+func PodLifeTime(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor, opts ...StrategyOption) {
 	if err := validatePodLifeTimeParams(strategy.Params); err != nil {
 		klog.ErrorS(err, "Invalid PodLifeTime parameters")
 		return

@@ -18,8 +18,11 @@ package descheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sigs.k8s.io/descheduler/pkg/descheduler/strategies/nodeutilization"
+	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -64,7 +67,7 @@ func Run(rs *options.DeschedulerServer) error {
 	return RunDeschedulerStrategies(ctx, rs, deschedulerPolicy, evictionPolicyGroupVersion, stopChannel)
 }
 
-type strategyFunction func(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor)
+type strategyFunction func(ctx context.Context, client clientset.Interface, strategy api.DeschedulerStrategy, nodes []*v1.Node, podEvictor *evictions.PodEvictor, options ...strategies.StrategyOption)
 
 func RunDeschedulerStrategies(ctx context.Context, rs *options.DeschedulerServer, deschedulerPolicy *api.DeschedulerPolicy, evictionPolicyGroupVersion string, stopChannel chan struct{}) error {
 	sharedInformerFactory := informers.NewSharedInformerFactory(rs.Client, 0)
@@ -84,6 +87,7 @@ func RunDeschedulerStrategies(ctx context.Context, rs *options.DeschedulerServer
 		"PodLifeTime":                                 strategies.PodLifeTime,
 		"RemovePodsViolatingTopologySpreadConstraint": strategies.RemovePodsViolatingTopologySpreadConstraint,
 		"RemoveFailedPods":                            strategies.RemoveFailedPods,
+		"ConstraintPolicyEvaluation":                  strategies.ConstraintPolicyEvaluation,
 	}
 
 	nodeSelector := rs.NodeSelector
@@ -139,14 +143,40 @@ func RunDeschedulerStrategies(ctx context.Context, rs *options.DeschedulerServer
 			ignorePvcPods,
 		)
 
+		// It is possible that after a single call to the strategies the descheduer exits. This assumes that each
+		// strategy can complete its work in a single call. This may not be the case and some strategies may
+		// need to continue processing for a short while. To accommodate this a wait group option has been
+		// added. If a strategy needs to complete some tasks (such as updating a k8s resource which may
+		// take several retries because of object version clashes) they can add themselves to the wait group.
+		var wg sync.WaitGroup
+
 		for name, strategy := range deschedulerPolicy.Strategies {
 			if f, ok := strategyFuncs[name]; ok {
 				if strategy.Enabled {
-					f(ctx, rs.Client, strategy, nodes, podEvictor)
+					f(ctx, rs.Client, strategy, nodes, podEvictor, strategies.WithKubeconfigFile(rs.KubeconfigFile),
+						strategies.WithWaitGroup(&wg), strategies.WithMitigationGracePeriod(rs.MitigationGracePeriod))
 				}
 			} else {
 				klog.ErrorS(fmt.Errorf("unknown strategy name"), "skipping strategy", "strategy", name)
 			}
+		}
+
+		// Wait for all strategies on the wait group to complete
+		klog.V(1).InfoS("Waiting for strategies to complete...", "waitTime", rs.DeschedulingRunTimeout.String())
+
+		c := make(chan struct{})
+
+		go func() {
+			defer close(c)
+			wg.Wait()
+		}()
+
+		select {
+		case <-c:
+			klog.V(1).InfoS("All strategies run to completion")
+		case <-time.After(rs.DeschedulingRunTimeout):
+			// NOTE: This leaks a go routine until the original wait group completes
+			klog.V(0).ErrorS(errors.New("time-out"), "Timeout while waiting for strategies to complete", "timeout", rs.DeschedulingRunTimeout.String())
 		}
 
 		klog.V(1).InfoS("Number of evicted pods", "totalEvicted", podEvictor.TotalEvicted())
